@@ -182,49 +182,39 @@ GLFWwindow* init_window(int width, int height, char const* title) {
 	return window;
 }
 
-//je 18 Vertices anlegen für Konus und Boden
-const int segments = 18; 
-static Vertex konusVertices[segments];
-static Vertex bodenVertices[segments];
-void setupGeometry()
-{
-	// Die Spitze des Konus ist ein Vertex, den alle Triangles gemeinsam haben;
-	// um einen Konus anstatt einen Kreis zu produzieren muss der Vertex einen positiven y-Wert haben
-	konusVertices[0].pos = glm::vec3(0, 75, 0);
-	konusVertices[0].color = glm::vec4(0, 0.6, 1, 1);
-	// Erzeuge einen weiteren Triangle_Fan um den Boden zu bedecken
-	// Das Zentrum des Triangle_Fans ist im Ursprung
-	bodenVertices[0].pos = glm::vec3(0, 0, 0);
-	bodenVertices[0].color = glm::vec4(0, 0.8, 0, 1);
-	// Kreise um den Mittelpunkt und spezifiziere Vertices entlang des Kreises
-	// um einen Triangle_Fan zu erzeugen
-	int iPivot = 1;
-	float angle = 2.0f * GL_PI;
-	for (int i = 1; i < segments; i++)
-	{
-		// Berechne x und z Positionen des naechsten Vertex
-		float x = 50.0f * sin(i * angle / (segments - 2));
-		float z = 50.0f * cos(i * angle / (segments - 2));
+//je 4 Vertices anlegen für Konus und Boden
+const int segments = 4;
+const float hp = sqrt(2 / 3);
+const float hd = sqrt(3) / 2;
+const float scale = 100.0;
 
-		// Alterniere die Farbe
-		if ((iPivot % 2) == 0) {
-			konusVertices[i].color = glm::vec4(0.235, 0.235, 0.235, 1);
-			bodenVertices[i].color = glm::vec4(1, 0.8, 0.2, 1);
-		}
-		else {
-			konusVertices[i].color = glm::vec4(0, 0.6, 1, 1);
-			bodenVertices[i].color = glm::vec4(0, 0.8, 0, 1);
-		}
-		// Inkrementiere iPivot um die Farbe beim naechsten mal zu wechseln
-		iPivot++;
+static Vertex tetraederVertices[segments];
+void setupGeometry() {
 
-		// Spezifiziere den naechsten Vertex des Konus_Triangle_Fans
-		konusVertices[i].pos = glm::vec3(x, 0, z);
-		// Spezifiziere den naechsten Vertex des Boden_Triangle_Fans
-		bodenVertices[segments - i].pos = glm::vec3(x, 0, z);
-	}
+	tetraederVertices[0].color = glm::vec4(0.9, 0.9, 0, 1); // gelb
+	tetraederVertices[0].pos   = glm::vec3(0.0, 0.0, 0.0);
+
+	tetraederVertices[1].color = glm::vec4(1.0, 0.5, 0, 1); // orange
+	tetraederVertices[1].pos   = glm::vec3(scale, 0.0, 0.0);
+
+	tetraederVertices[2].color = glm::vec4(0.4, 0.0, 0, 1); // dunkelrot
+	tetraederVertices[2].pos   = glm::vec3(scale / 2, 0.0, scale * hd);
+
+	tetraederVertices[3].color = glm::vec4(0.7, 0.3, 0, 1); // dunkelorange
+	tetraederVertices[3].pos   = glm::vec3(scale / 2, 100, scale / 3 * hd); // 100 korr -scale*hp
 }
 
+// Indices für 4 Seiten des Tetraeders: links, rechts, hinten, oben
+std::vector<uint16_t> indices = {
+	0, 2, 3,
+	3, 2, 1,
+	3, 1, 0,
+	2, 0, 1
+	/*0, 1, 2,
+	1, 3, 2,
+	2, 3, 0,
+	3, 1, 0*/
+};
 void update_modelMatrix(glm::mat4& mMatrix, float dt)
 {
 	float camera_dolly_speed = CAM_SPEED;
@@ -397,7 +387,7 @@ int main() {
 		vertex_input_bindings, 1,
 		vertex_attributes, vertex_attribute_count,
 		shader_setup, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_BACK_BIT, VK_POLYGON_MODE_FILL,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
+		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
 		VK_FRONT_FACE_COUNTER_CLOCKWISE,
 		vkal_info->render_pass, pipeline_layout);
 
@@ -405,7 +395,7 @@ int main() {
 		vertex_input_bindings, 1,
 		vertex_attributes, vertex_attribute_count,
 		shader_setup, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_NONE, VK_POLYGON_MODE_FILL,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
+		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
 		VK_FRONT_FACE_COUNTER_CLOCKWISE,
 		vkal_info->render_pass, pipeline_layout);
 
@@ -413,7 +403,7 @@ int main() {
 		vertex_input_bindings, 1,
 		vertex_attributes, vertex_attribute_count,
 		shader_setup, VK_FALSE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_BACK_BIT, VK_POLYGON_MODE_FILL,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
+		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
 		VK_FRONT_FACE_COUNTER_CLOCKWISE,
 		vkal_info->render_pass, pipeline_layout);
 
@@ -421,7 +411,7 @@ int main() {
 		vertex_input_bindings, 1,
 		vertex_attributes, vertex_attribute_count,
 		shader_setup, VK_FALSE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_NONE, VK_POLYGON_MODE_FILL,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
+		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
 		VK_FRONT_FACE_COUNTER_CLOCKWISE,
 		vkal_info->render_pass, pipeline_layout);
 
@@ -429,7 +419,7 @@ int main() {
 		vertex_input_bindings, 1,
 		vertex_attributes, vertex_attribute_count,
 		shader_setup, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_BACK_BIT, VK_POLYGON_MODE_LINE,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
+		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
 		VK_FRONT_FACE_COUNTER_CLOCKWISE,
 		vkal_info->render_pass, pipeline_layout);
 
@@ -437,7 +427,7 @@ int main() {
 		vertex_input_bindings, 1,
 		vertex_attributes, vertex_attribute_count,
 		shader_setup, VK_FALSE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_BACK_BIT, VK_POLYGON_MODE_LINE,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
+		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
 		VK_FRONT_FACE_COUNTER_CLOCKWISE,
 		vkal_info->render_pass, pipeline_layout);
 
@@ -445,7 +435,7 @@ int main() {
 		vertex_input_bindings, 1,
 		vertex_attributes, vertex_attribute_count,
 		shader_setup, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_NONE, VK_POLYGON_MODE_LINE,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
+		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
 		VK_FRONT_FACE_COUNTER_CLOCKWISE,
 		vkal_info->render_pass, pipeline_layout);
 
@@ -453,72 +443,8 @@ int main() {
 		vertex_input_bindings, 1,
 		vertex_attributes, vertex_attribute_count,
 		shader_setup, VK_FALSE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_NONE, VK_POLYGON_MODE_LINE,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
+		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
 		VK_FRONT_FACE_COUNTER_CLOCKWISE,
-		vkal_info->render_pass, pipeline_layout);
-
-	VkPipeline pipeline_filled_polys_backface = vkal_create_graphics_pipeline(
-		vertex_input_bindings, 1,
-		vertex_attributes, vertex_attribute_count,
-		shader_setup, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_BACK_BIT, VK_POLYGON_MODE_FILL,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
-		VK_FRONT_FACE_CLOCKWISE,
-		vkal_info->render_pass, pipeline_layout);
-
-	VkPipeline pipeline_filled_polys_no_cull_backface = vkal_create_graphics_pipeline(
-		vertex_input_bindings, 1,
-		vertex_attributes, vertex_attribute_count,
-		shader_setup, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_NONE, VK_POLYGON_MODE_FILL,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
-		VK_FRONT_FACE_CLOCKWISE,
-		vkal_info->render_pass, pipeline_layout);
-
-	VkPipeline pipeline_filled_polys_no_depth_backface = vkal_create_graphics_pipeline(
-		vertex_input_bindings, 1,
-		vertex_attributes, vertex_attribute_count,
-		shader_setup, VK_FALSE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_BACK_BIT, VK_POLYGON_MODE_FILL,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
-		VK_FRONT_FACE_CLOCKWISE,
-		vkal_info->render_pass, pipeline_layout);
-
-	VkPipeline pipeline_filled_polys_no_depth_no_cull_backface = vkal_create_graphics_pipeline(
-		vertex_input_bindings, 1,
-		vertex_attributes, vertex_attribute_count,
-		shader_setup, VK_FALSE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_NONE, VK_POLYGON_MODE_FILL,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
-		VK_FRONT_FACE_CLOCKWISE,
-		vkal_info->render_pass, pipeline_layout);
-
-	VkPipeline pipeline_lines_backface = vkal_create_graphics_pipeline(
-		vertex_input_bindings, 1,
-		vertex_attributes, vertex_attribute_count,
-		shader_setup, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_BACK_BIT, VK_POLYGON_MODE_LINE,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
-		VK_FRONT_FACE_CLOCKWISE,
-		vkal_info->render_pass, pipeline_layout);
-
-	VkPipeline pipeline_lines_no_depth_backface = vkal_create_graphics_pipeline(
-		vertex_input_bindings, 1,
-		vertex_attributes, vertex_attribute_count,
-		shader_setup, VK_FALSE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_BACK_BIT, VK_POLYGON_MODE_LINE,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
-		VK_FRONT_FACE_CLOCKWISE,
-		vkal_info->render_pass, pipeline_layout);
-
-	VkPipeline pipeline_lines_no_cull_backface = vkal_create_graphics_pipeline(
-		vertex_input_bindings, 1,
-		vertex_attributes, vertex_attribute_count,
-		shader_setup, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_NONE, VK_POLYGON_MODE_LINE,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
-		VK_FRONT_FACE_CLOCKWISE,
-		vkal_info->render_pass, pipeline_layout);
-
-	VkPipeline pipeline_lines_no_depth_no_cull_backface = vkal_create_graphics_pipeline(
-		vertex_input_bindings, 1,
-		vertex_attributes, vertex_attribute_count,
-		shader_setup, VK_FALSE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_NONE, VK_POLYGON_MODE_LINE,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
-		VK_FRONT_FACE_CLOCKWISE,
 		vkal_info->render_pass, pipeline_layout);
 
 	// Uniform Buffers
@@ -530,12 +456,11 @@ int main() {
 
 	// Build cone geometry
 	setupGeometry();
-	Model coneMantle{};
-	coneMantle.vertex_count = 18;
-	coneMantle.offset = vkal_vertex_buffer_add(konusVertices, sizeof(Vertex), 18);
-	Model coneBase{};
-	coneBase.vertex_count = 18;
-	coneBase.offset = vkal_vertex_buffer_add(bodenVertices, sizeof(Vertex), 18);
+	Model coneTetraeder{};
+	coneTetraeder.vertex_count = 4;
+	coneTetraeder.offset = vkal_vertex_buffer_add(tetraederVertices, sizeof(Vertex), coneTetraeder.vertex_count);
+	coneTetraeder.index_count = indices.size();
+	coneTetraeder.index_buffer_offset = vkal_index_buffer_add(indices.data(), coneTetraeder.index_count);
 
 	// ModelMatrix
 	glm::mat4 modelMatrix = glm::mat4(1);
@@ -556,7 +481,6 @@ int main() {
 	bool enableDepthTest = true;
 	bool enableCulling = true;
 	bool enableFillMode = true;
-	bool enableFrontFace = true;
 	VkPipeline active_pipeline = pipeline_filled_polys;
 	while (!glfwWindowShouldClose(window)) {
 		double start_time = glfwGetTime();
@@ -578,7 +502,6 @@ int main() {
 			ImGui::Checkbox("Enable Depth test", &enableDepthTest);
 			ImGui::Checkbox("Enable Face culling", &enableCulling);
 			ImGui::Checkbox("Enable Fill Mode", &enableFillMode);
-			ImGui::Checkbox("Enable Front Face", &enableFrontFace);
 			ImGui::End();
 		}
 
@@ -597,53 +520,29 @@ int main() {
 		vkal_update_uniform(&uniform_buffer_handle, &view_projection_data);
 
 		// Select pipeline
-		if (enableDepthTest && enableCulling && enableFillMode && enableFrontFace) {
+		if (enableDepthTest && enableCulling && enableFillMode) {
 			active_pipeline = pipeline_filled_polys;
 		}
-		else if (enableDepthTest && !enableCulling && enableFillMode && enableFrontFace) {
+		else if (enableDepthTest && !enableCulling && enableFillMode) {
 			active_pipeline = pipeline_filled_polys_no_cull;
 		}
-		else if (!enableDepthTest && enableCulling && enableFillMode && enableFrontFace) {
+		else if (!enableDepthTest && enableCulling && enableFillMode) {
 			active_pipeline = pipeline_filled_polys_no_depth;
 		}
-		else if (!enableDepthTest && !enableCulling && enableFillMode && enableFrontFace){
+		else if (!enableDepthTest && !enableCulling && enableFillMode){
 			active_pipeline = pipeline_filled_polys_no_depth_no_cull;
 		}
-		else if (enableDepthTest && enableCulling && !enableFillMode && enableFrontFace) {
+		else if (enableDepthTest && enableCulling && !enableFillMode) {
 			active_pipeline = pipeline_lines;
 		}
-		else if (enableDepthTest && !enableCulling && !enableFillMode && enableFrontFace) {
+		else if (enableDepthTest && !enableCulling && !enableFillMode) {
 			active_pipeline = pipeline_lines_no_cull;
 		}
-		else if (!enableDepthTest && enableCulling && !enableFillMode && enableFrontFace) {
+		else if (!enableDepthTest && enableCulling && !enableFillMode) {
 			active_pipeline = pipeline_lines_no_depth;
 		}
-		else if (!enableDepthTest && !enableCulling && !enableFillMode && enableFrontFace) {
+		else if (!enableDepthTest && !enableCulling && !enableFillMode) {
 			active_pipeline = pipeline_lines_no_depth_no_cull;
-		}
-		else if (enableDepthTest && enableCulling && enableFillMode && !enableFrontFace) {
-			active_pipeline = pipeline_filled_polys_backface;
-		}
-		else if (enableDepthTest && !enableCulling && enableFillMode && !enableFrontFace) {
-			active_pipeline = pipeline_filled_polys_no_cull_backface;
-		}
-		else if (!enableDepthTest && enableCulling && enableFillMode && !enableFrontFace) {
-			active_pipeline = pipeline_filled_polys_no_depth_backface;
-		}
-		else if (!enableDepthTest && !enableCulling && enableFillMode && !enableFrontFace) {
-			active_pipeline = pipeline_filled_polys_no_depth_no_cull_backface;
-		}
-		else if (enableDepthTest && enableCulling && !enableFillMode && !enableFrontFace) {
-			active_pipeline = pipeline_lines_backface;
-		}
-		else if (enableDepthTest && !enableCulling && !enableFillMode && !enableFrontFace) {
-			active_pipeline = pipeline_lines_no_cull_backface;
-		}
-		else if (!enableDepthTest && enableCulling && !enableFillMode && !enableFrontFace) {
-			active_pipeline = pipeline_lines_no_depth_backface;
-		}
-		else if (!enableDepthTest && !enableCulling && !enableFillMode && !enableFrontFace) {
-			active_pipeline = pipeline_lines_no_depth_no_cull_backface;
 		}
 
 		{
@@ -661,8 +560,7 @@ int main() {
 			vkal_set_clear_color({ 0.6f, 0.6f, 0.6f, 1.0f });
 
 			vkal_bind_descriptor_set(image_id, &descriptor_set_1[0], pipeline_layout);
-			vkal_draw(image_id, active_pipeline, coneBase.offset, coneBase.vertex_count);
-			vkal_draw(image_id, active_pipeline, coneMantle.offset, coneMantle.vertex_count);
+			vkal_draw_indexed(image_id, active_pipeline, coneTetraeder.index_buffer_offset, coneTetraeder.index_count, coneTetraeder.offset, 1);
 
 			// Rendering ImGUI
 			ImGui::Render();

@@ -408,3 +408,5 @@ FodyWeavers.xsd
 dependencies/assimp
 
 dependencies/vkal
+
+*.zip

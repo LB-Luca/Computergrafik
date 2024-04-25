@@ -190,7 +190,7 @@ const float hp = sqrt(2.0 / 3.0);
 const float hd = sqrt(3.0) / 2.0;
 
 // Indices für 4 Seiten des Tetraeders: links, rechts, hinten, oben
-std::vector<uint16_t> tetraederIndices = {
+std::vector<uint16_t> base_tetraeder_indices = {
 	2, 1, 0,
 	1, 2, 3,
 	3, 2, 0,
@@ -221,7 +221,7 @@ void setupGeometry(int depth, float scale, glm::mat4 transmatrix, std::vector<Ve
 			vertices.push_back(tetraeder[i]);
 		}
 		for (int i = 0; i < 12; i++) {
-			indices.push_back(offset + tetraederIndices[i]);
+			indices.push_back(offset + base_tetraeder_indices[i]);
 		}
 	}
 
@@ -491,8 +491,6 @@ int main() {
 	std::vector<Vertex> tetraederVertices = {};
 
 	// Build tetraeder geometry
-	//glm::mat4 translationsMatrix = glm::mat4(1); // Startmatrix mit 1 auf Diagonale
-	//static Vertex tetraederVertices[4];
 	
 	bool enableDepthTest = true;
 	int iterations = 0;
@@ -600,7 +598,7 @@ int main() {
 			coneTetraeder.index_buffer_offset = vkal_index_buffer_add(tetraederIndices.data(), coneTetraeder.index_count);
 			old_iterations = iterations;
 		}
-
+		
 		{
 			uint32_t image_id = vkal_get_image();
 

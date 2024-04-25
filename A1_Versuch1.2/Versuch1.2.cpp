@@ -17,6 +17,8 @@
 
 #include <modelloader/Model.h>
 
+#include <cstdlib>
+
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -182,39 +184,69 @@ GLFWwindow* init_window(int width, int height, char const* title) {
 	return window;
 }
 
-//je 4 Vertices anlegen für Konus und Boden
+//4 Vertices anlegen für Tetraeder
 const int segments = 4;
-const float hp = sqrt(2 / 3);
-const float hd = sqrt(3) / 2;
-const float scale = 100.0;
-
-static Vertex tetraederVertices[segments];
-void setupGeometry() {
-
-	tetraederVertices[0].color = glm::vec4(0.9, 0.9, 0, 1); // gelb
-	tetraederVertices[0].pos   = glm::vec3(0.0, 0.0, 0.0);
-
-	tetraederVertices[1].color = glm::vec4(1.0, 0.5, 0, 1); // orange
-	tetraederVertices[1].pos   = glm::vec3(scale, 0.0, 0.0);
-
-	tetraederVertices[2].color = glm::vec4(0.4, 0.0, 0, 1); // dunkelrot
-	tetraederVertices[2].pos   = glm::vec3(scale / 2, 0.0, scale * hd);
-
-	tetraederVertices[3].color = glm::vec4(0.7, 0.3, 0, 1); // dunkelorange
-	tetraederVertices[3].pos   = glm::vec3(scale / 2, 100, scale / 3 * hd); // 100 korr -scale*hp
-}
+const float hp = sqrt(2.0 / 3.0);
+const float hd = sqrt(3.0) / 2.0;
 
 // Indices für 4 Seiten des Tetraeders: links, rechts, hinten, oben
-std::vector<uint16_t> indices = {
-	0, 2, 3,
-	3, 2, 1,
-	3, 1, 0,
-	2, 0, 1
-	/*0, 1, 2,
-	1, 3, 2,
-	2, 3, 0,
-	3, 1, 0*/
+std::vector<uint16_t> tetraederIndices = {
+	2, 1, 0,
+	1, 2, 3,
+	3, 2, 0,
+	0, 1, 3
 };
+
+void setupGeometry(int depth, float scale, glm::mat4 transmatrix, std::vector<Vertex> &vertices, std::vector<uint16_t> &indices) {
+	if(depth == 0){
+		static Vertex tetraeder[4];
+		//std::array<Vertex, 4> tetraeder{};
+
+		tetraeder[0].color = glm::vec4(0.9, 0.9, 0, 1); // gelb
+		tetraeder[1].color = glm::vec4(1.0, 0.5, 0, 1); // orange
+		tetraeder[2].color = glm::vec4(0.4, 0.0, 0, 1); // dunkelrot
+		tetraeder[3].color = glm::vec4(0.7, 0.3, 0, 1); // dunkelorange
+		
+		//glm::mat4 rotation = glm::rotate(glm::mat4(1), (float)std::rand(), glm::vec3(1));
+
+		tetraeder[0].pos   = transmatrix * glm::vec4(0.0, 0.0, 0.0, 1);	
+		tetraeder[1].pos   = transmatrix * glm::vec4(scale, 0.0, 0.0, 1);
+		tetraeder[2].pos   = transmatrix * glm::vec4(scale / 2, 0.0, scale * hd, 1);
+		tetraeder[3].pos   = transmatrix * glm::vec4(scale / 2, scale * hp, scale / 3 * hd, 1);
+
+		int offset = vertices.size();
+
+		// push positions and indices on stack lists
+		for (int i = 0; i < 4; i++) {
+			vertices.push_back(tetraeder[i]);
+		}
+		for (int i = 0; i < 12; i++) {
+			indices.push_back(offset + tetraederIndices[i]);
+		}
+	}
+
+	else {
+		scale = 0.5f * scale;
+		//Koordinaten der Vertices
+		//glm::vec3 pointA = glm::vec3(0.0, 0.0, 0.0);
+		glm::vec3 pointB = glm::vec3(scale, 0.0, 0.0);
+		glm::vec3 pointC = glm::vec3(scale / 2, 0.0, scale * hd);
+		glm::vec3 pointD = glm::vec3(scale / 2, scale * hp, scale / 3 * hd);
+
+		//4x4 Transformations-Matrizen mit 0.5 der Strecke zu den Vertices (A ist im Ursprung)
+		//glm::mat4 translationA = transmatrix;
+		glm::mat4 translationB = glm::translate(transmatrix, pointB);
+		glm::mat4 translationC = glm::translate(transmatrix, pointC);
+		glm::mat4 translationD = glm::translate(transmatrix, pointD);
+
+		//int newDepth = depth - 1;
+		setupGeometry(depth-1, scale, transmatrix, vertices, indices);
+		setupGeometry(depth-1, scale, translationB, vertices, indices);
+		setupGeometry(depth-1, scale, translationC, vertices, indices);
+		setupGeometry(depth-1, scale, translationD, vertices, indices);
+	}
+
+}
 void update_modelMatrix(glm::mat4& mMatrix, float dt)
 {
 	float camera_dolly_speed = CAM_SPEED;
@@ -387,64 +419,64 @@ int main() {
 		vertex_input_bindings, 1,
 		vertex_attributes, vertex_attribute_count,
 		shader_setup, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_BACK_BIT, VK_POLYGON_MODE_FILL,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
-		VK_FRONT_FACE_COUNTER_CLOCKWISE,
+		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+		VK_FRONT_FACE_CLOCKWISE,
 		vkal_info->render_pass, pipeline_layout);
 
 	VkPipeline pipeline_filled_polys_no_cull = vkal_create_graphics_pipeline(
 		vertex_input_bindings, 1,
 		vertex_attributes, vertex_attribute_count,
 		shader_setup, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_NONE, VK_POLYGON_MODE_FILL,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
-		VK_FRONT_FACE_COUNTER_CLOCKWISE,
+		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+		VK_FRONT_FACE_CLOCKWISE,
 		vkal_info->render_pass, pipeline_layout);
 
 	VkPipeline pipeline_filled_polys_no_depth = vkal_create_graphics_pipeline(
 		vertex_input_bindings, 1,
 		vertex_attributes, vertex_attribute_count,
 		shader_setup, VK_FALSE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_BACK_BIT, VK_POLYGON_MODE_FILL,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
-		VK_FRONT_FACE_COUNTER_CLOCKWISE,
+		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+		VK_FRONT_FACE_CLOCKWISE,
 		vkal_info->render_pass, pipeline_layout);
 
 	VkPipeline pipeline_filled_polys_no_depth_no_cull = vkal_create_graphics_pipeline(
 		vertex_input_bindings, 1,
 		vertex_attributes, vertex_attribute_count,
 		shader_setup, VK_FALSE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_NONE, VK_POLYGON_MODE_FILL,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
-		VK_FRONT_FACE_COUNTER_CLOCKWISE,
+		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+		VK_FRONT_FACE_CLOCKWISE,
 		vkal_info->render_pass, pipeline_layout);
 
 	VkPipeline pipeline_lines = vkal_create_graphics_pipeline(
 		vertex_input_bindings, 1,
 		vertex_attributes, vertex_attribute_count,
 		shader_setup, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_BACK_BIT, VK_POLYGON_MODE_LINE,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
-		VK_FRONT_FACE_COUNTER_CLOCKWISE,
+		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+		VK_FRONT_FACE_CLOCKWISE,
 		vkal_info->render_pass, pipeline_layout);
 
 	VkPipeline pipeline_lines_no_depth = vkal_create_graphics_pipeline(
 		vertex_input_bindings, 1,
 		vertex_attributes, vertex_attribute_count,
 		shader_setup, VK_FALSE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_BACK_BIT, VK_POLYGON_MODE_LINE,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
-		VK_FRONT_FACE_COUNTER_CLOCKWISE,
+		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+		VK_FRONT_FACE_CLOCKWISE,
 		vkal_info->render_pass, pipeline_layout);
 
 	VkPipeline pipeline_lines_no_cull = vkal_create_graphics_pipeline(
 		vertex_input_bindings, 1,
 		vertex_attributes, vertex_attribute_count,
 		shader_setup, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_NONE, VK_POLYGON_MODE_LINE,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
-		VK_FRONT_FACE_COUNTER_CLOCKWISE,
+		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+		VK_FRONT_FACE_CLOCKWISE,
 		vkal_info->render_pass, pipeline_layout);
 
 	VkPipeline pipeline_lines_no_depth_no_cull = vkal_create_graphics_pipeline(
 		vertex_input_bindings, 1,
 		vertex_attributes, vertex_attribute_count,
 		shader_setup, VK_FALSE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_NONE, VK_POLYGON_MODE_LINE,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
-		VK_FRONT_FACE_COUNTER_CLOCKWISE,
+		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+		VK_FRONT_FACE_CLOCKWISE,
 		vkal_info->render_pass, pipeline_layout);
 
 	// Uniform Buffers
@@ -454,13 +486,27 @@ int main() {
 	// Initialize Uniform Buffer
 	vkal_update_uniform(&uniform_buffer_handle, &view_projection_data);
 
-	// Build cone geometry
-	setupGeometry();
+	// Indices für 4 Seiten des Tetraeders: links, rechts, hinten, oben
+	std::vector<uint16_t> tetraederIndices = {};
+	std::vector<Vertex> tetraederVertices = {};
+
+	// Build tetraeder geometry
+	//glm::mat4 translationsMatrix = glm::mat4(1); // Startmatrix mit 1 auf Diagonale
+	//static Vertex tetraederVertices[4];
+	
+	bool enableDepthTest = true;
+	int iterations = 0;
+	int old_iterations = 0;
+	bool enableCulling = true;
+	bool enableFillMode = true;
+
+	const float scale = 100.0; // size of Base-Tetraeder
+	setupGeometry(iterations, scale, glm::mat4(1), tetraederVertices, tetraederIndices);
 	Model coneTetraeder{};
-	coneTetraeder.vertex_count = 4;
-	coneTetraeder.offset = vkal_vertex_buffer_add(tetraederVertices, sizeof(Vertex), coneTetraeder.vertex_count);
-	coneTetraeder.index_count = indices.size();
-	coneTetraeder.index_buffer_offset = vkal_index_buffer_add(indices.data(), coneTetraeder.index_count);
+	coneTetraeder.vertex_count = tetraederVertices.size();
+	coneTetraeder.offset = vkal_vertex_buffer_add(tetraederVertices.data(), sizeof(Vertex), tetraederVertices.size());
+	coneTetraeder.index_count = tetraederIndices.size();
+	coneTetraeder.index_buffer_offset = vkal_index_buffer_add(tetraederIndices.data(), coneTetraeder.index_count);
 
 	// ModelMatrix
 	glm::mat4 modelMatrix = glm::mat4(1);
@@ -478,9 +524,6 @@ int main() {
 
 	// MAIN LOOP
 	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-	bool enableDepthTest = true;
-	bool enableCulling = true;
-	bool enableFillMode = true;
 	VkPipeline active_pipeline = pipeline_filled_polys;
 	while (!glfwWindowShouldClose(window)) {
 		double start_time = glfwGetTime();
@@ -498,9 +541,10 @@ int main() {
 		ImGui::NewFrame();
 
 		{
-			ImGui::Begin("Versuch 1");
-			ImGui::Checkbox("Enable Depth test", &enableDepthTest);
-			ImGui::Checkbox("Enable Face culling", &enableCulling);
+			ImGui::Begin("Versuch 1.2");
+			//ImGui::Checkbox("Enable Depth test", &enableDepthTest);
+			//ImGui::Checkbox("Enable Face culling", &enableCulling);
+			ImGui::SliderInt("Iterations", &iterations, 0, 7);
 			ImGui::Checkbox("Enable Fill Mode", &enableFillMode);
 			ImGui::End();
 		}
@@ -543,6 +587,18 @@ int main() {
 		}
 		else if (!enableDepthTest && !enableCulling && !enableFillMode) {
 			active_pipeline = pipeline_lines_no_depth_no_cull;
+		}
+
+		if (old_iterations != iterations){
+			tetraederIndices.clear();
+			tetraederVertices.clear();
+			setupGeometry(iterations, scale, glm::mat4(1), tetraederVertices, tetraederIndices);
+			coneTetraeder = Model();
+			coneTetraeder.vertex_count = tetraederVertices.size();
+			coneTetraeder.offset = vkal_vertex_buffer_add(tetraederVertices.data(), sizeof(Vertex), tetraederVertices.size());
+			coneTetraeder.index_count = tetraederIndices.size();
+			coneTetraeder.index_buffer_offset = vkal_index_buffer_add(tetraederIndices.data(), coneTetraeder.index_count);
+			old_iterations = iterations;
 		}
 
 		{

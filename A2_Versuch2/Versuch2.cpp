@@ -3,6 +3,8 @@
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
 
+#include <chrono>
+
 #include <imgui/imgui.h>
 #include <imgui/backends/imgui_impl_glfw.h>
 #include <imgui/backends/imgui_impl_vulkan.h>
@@ -423,58 +425,10 @@ int main() {
 		VK_FRONT_FACE_CLOCKWISE,
 		vkal_info->render_pass, pipeline_layout);
 
-	VkPipeline pipeline_filled_polys_no_cull = vkal_create_graphics_pipeline(
-		vertex_input_bindings, 1,
-		vertex_attributes, vertex_attribute_count,
-		shader_setup, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_NONE, VK_POLYGON_MODE_FILL,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-		VK_FRONT_FACE_CLOCKWISE,
-		vkal_info->render_pass, pipeline_layout);
-
-	VkPipeline pipeline_filled_polys_no_depth = vkal_create_graphics_pipeline(
-		vertex_input_bindings, 1,
-		vertex_attributes, vertex_attribute_count,
-		shader_setup, VK_FALSE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_BACK_BIT, VK_POLYGON_MODE_FILL,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-		VK_FRONT_FACE_CLOCKWISE,
-		vkal_info->render_pass, pipeline_layout);
-
-	VkPipeline pipeline_filled_polys_no_depth_no_cull = vkal_create_graphics_pipeline(
-		vertex_input_bindings, 1,
-		vertex_attributes, vertex_attribute_count,
-		shader_setup, VK_FALSE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_NONE, VK_POLYGON_MODE_FILL,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-		VK_FRONT_FACE_CLOCKWISE,
-		vkal_info->render_pass, pipeline_layout);
-
 	VkPipeline pipeline_lines = vkal_create_graphics_pipeline(
 		vertex_input_bindings, 1,
 		vertex_attributes, vertex_attribute_count,
 		shader_setup, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_BACK_BIT, VK_POLYGON_MODE_LINE,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-		VK_FRONT_FACE_CLOCKWISE,
-		vkal_info->render_pass, pipeline_layout);
-
-	VkPipeline pipeline_lines_no_depth = vkal_create_graphics_pipeline(
-		vertex_input_bindings, 1,
-		vertex_attributes, vertex_attribute_count,
-		shader_setup, VK_FALSE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_BACK_BIT, VK_POLYGON_MODE_LINE,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-		VK_FRONT_FACE_CLOCKWISE,
-		vkal_info->render_pass, pipeline_layout);
-
-	VkPipeline pipeline_lines_no_cull = vkal_create_graphics_pipeline(
-		vertex_input_bindings, 1,
-		vertex_attributes, vertex_attribute_count,
-		shader_setup, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_NONE, VK_POLYGON_MODE_LINE,
-		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-		VK_FRONT_FACE_CLOCKWISE,
-		vkal_info->render_pass, pipeline_layout);
-
-	VkPipeline pipeline_lines_no_depth_no_cull = vkal_create_graphics_pipeline(
-		vertex_input_bindings, 1,
-		vertex_attributes, vertex_attribute_count,
-		shader_setup, VK_FALSE, VK_COMPARE_OP_LESS_OR_EQUAL, VK_CULL_MODE_NONE, VK_POLYGON_MODE_LINE,
 		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
 		VK_FRONT_FACE_CLOCKWISE,
 		vkal_info->render_pass, pipeline_layout);
@@ -491,12 +445,12 @@ int main() {
 	std::vector<Vertex> tetraederVertices = {};
 
 	// Build tetraeder geometry
-	
 	bool enableDepthTest = true;
 	int iterations = 0;
 	int old_iterations = 0;
 	bool enableCulling = true;
 	bool enableFillMode = true;
+	bool perspective = false;
 
 	const float scale = 100.0; // size of Base-Tetraeder
 	setupGeometry(iterations, scale, glm::mat4(1), tetraederVertices, tetraederIndices);
@@ -508,8 +462,9 @@ int main() {
 
 	// ModelMatrix
 	glm::mat4 modelMatrix = glm::mat4(1);
+	modelMatrix = glm::translate(modelMatrix, glm::vec3(-scale/2, 0.0, -scale / 3 * hd));
 	// Camera
-	Camera camera = Camera(glm::vec3(0, 0, 100));
+	Camera camera = Camera(glm::vec3(0, 0, 200));
 
 	// User Interface 
 	double timer_frequency = glfwGetTimerFrequency();
@@ -519,6 +474,13 @@ int main() {
 
 	int width = 800;
 	int height = 600;
+	float fov = 45.0;
+
+	// Timer functions
+	auto start = std::chrono::high_resolution_clock::now();
+	float periodendauer = 5;
+	
+	double base_time = glfwGetTime();
 
 	// MAIN LOOP
 	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
@@ -533,6 +495,16 @@ int main() {
 			glfwGetFramebufferSize(window, &width, &height);
 		}
 
+		// Timer
+		auto duration = std::chrono::high_resolution_clock::now();
+		float angle = std::chrono::duration_cast<std::chrono::milliseconds>(duration - start).count();
+		//float angle = std::chrono::duration_cast<std::chrono::milliseconds>(
+		//	std::chrono::system_clock::now().time_since_epoch()).count(); // Zeit in Millisekunden
+		//float sinusValue = std::sin(angle / (2 * GL_PI * periodendauer));
+		float degreeValue = std::fmod(static_cast<float>(start_time-base_time)*1e3 / (2 * GL_PI * periodendauer), 360.0);
+		glm::mat4 rotatedModelMatrix = glm::rotate(glm::mat4(1.0f), glm::radians(degreeValue), glm::vec3(0.0f, 1.0f, 0.0f)) * modelMatrix;
+
+
 		// Start the Dear ImGui frame
 		ImGui_ImplVulkan_NewFrame();
 		ImGui_ImplGlfw_NewFrame();
@@ -542,13 +514,12 @@ int main() {
 			ImGui::Begin("Versuch 1.2");
 			//ImGui::Checkbox("Enable Depth test", &enableDepthTest);
 			//ImGui::Checkbox("Enable Face culling", &enableCulling);
-			ImGui::SliderInt("Iterations", &iterations, 0, 9);
+			ImGui::SliderInt("Iterations", &iterations, 0, 8);
 			ImGui::Checkbox("Enable Fill Mode", &enableFillMode);
+			ImGui::Checkbox("Perspective", &perspective);
+			ImGui::SliderFloat("FOV", &fov, 30.0, 89.0);
 			ImGui::End();
 		}
-
-		update_modelMatrix(modelMatrix, float(dt * 100.f));
-		update_camera(camera, float(dt * 1000.f));
 
 
 		// Mouse update
@@ -556,41 +527,28 @@ int main() {
 			update_camera_mouse_look(camera, dt*1000.0f);
 		}
 
-		view_projection_data.model = modelMatrix;
-		view_projection_data.projection = adjust_y_for_vulkan_ndc * glm::ortho(-100.0f, 100.0f, -100.0f, 100.0f, -1000.0f, 1000.0f);
+		view_projection_data.model = rotatedModelMatrix;
+		if (perspective) {
+			view_projection_data.projection = adjust_y_for_vulkan_ndc * glm::perspective(glm::radians(fov),float(width/height),100.0f,1000.0f);
+		}
+		else {
+			view_projection_data.projection = adjust_y_for_vulkan_ndc * glm::ortho(-100.0f, 100.0f, -100.0f, 100.0f, -1000.0f, 1000.0f);	
+		}
 		view_projection_data.view = glm::lookAt(camera.m_Pos, camera.m_Center, camera.m_Up);
 		vkal_update_uniform(&uniform_buffer_handle, &view_projection_data);
 
 		// Select pipeline
-		if (enableDepthTest && enableCulling && enableFillMode) {
+		if (enableFillMode) {
 			active_pipeline = pipeline_filled_polys;
 		}
-		else if (enableDepthTest && !enableCulling && enableFillMode) {
-			active_pipeline = pipeline_filled_polys_no_cull;
-		}
-		else if (!enableDepthTest && enableCulling && enableFillMode) {
-			active_pipeline = pipeline_filled_polys_no_depth;
-		}
-		else if (!enableDepthTest && !enableCulling && enableFillMode){
-			active_pipeline = pipeline_filled_polys_no_depth_no_cull;
-		}
-		else if (enableDepthTest && enableCulling && !enableFillMode) {
+		else if (!enableFillMode) {
 			active_pipeline = pipeline_lines;
-		}
-		else if (enableDepthTest && !enableCulling && !enableFillMode) {
-			active_pipeline = pipeline_lines_no_cull;
-		}
-		else if (!enableDepthTest && enableCulling && !enableFillMode) {
-			active_pipeline = pipeline_lines_no_depth;
-		}
-		else if (!enableDepthTest && !enableCulling && !enableFillMode) {
-			active_pipeline = pipeline_lines_no_depth_no_cull;
 		}
 
 		if (old_iterations != iterations){
 			tetraederIndices.clear();
 			tetraederVertices.clear();
-			setupGeometry(iterations, scale, glm::mat4(1), tetraederVertices, tetraederIndices);
+			setupGeometry(iterations, scale, rotatedModelMatrix, tetraederVertices, tetraederIndices);
 			coneTetraeder = Model();
 			coneTetraeder.vertex_count = tetraederVertices.size();
 			coneTetraeder.offset = vkal_vertex_buffer_add(tetraederVertices.data(), sizeof(Vertex), tetraederVertices.size());
@@ -598,6 +556,9 @@ int main() {
 			coneTetraeder.index_buffer_offset = vkal_index_buffer_add(tetraederIndices.data(), coneTetraeder.index_count);
 			old_iterations = iterations;
 		}
+
+		update_modelMatrix(rotatedModelMatrix, float(dt * 100.f));
+		update_camera(camera, float(dt * 1000.f));
 		
 		{
 			uint32_t image_id = vkal_get_image();

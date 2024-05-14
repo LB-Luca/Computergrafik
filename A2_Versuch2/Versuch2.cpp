@@ -374,7 +374,7 @@ int main() {
 			0, // binding id ( matches with shader )
 			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 			1, // number of resources with this layout binding
-			VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT,
+			VK_SHADER_STAGE_VERTEX_BIT,
 			0
 		}
 	};
@@ -386,8 +386,11 @@ int main() {
 	};
 	uint32_t descriptor_set_layout_count = sizeof(layouts) / sizeof(*layouts);
 
-	VkDescriptorSet* descriptor_set_1 = (VkDescriptorSet*)malloc(descriptor_set_layout_count * sizeof(VkDescriptorSet));
-	vkal_allocate_descriptor_sets(vkal_info->default_descriptor_pool, layouts, 1, &descriptor_set_1);
+	VkDescriptorSet* descriptor_set_center_tet = (VkDescriptorSet*)malloc(descriptor_set_layout_count * sizeof(VkDescriptorSet));
+	VkDescriptorSet* descriptor_set_outter_tet = (VkDescriptorSet*)malloc(descriptor_set_layout_count * sizeof(VkDescriptorSet));
+
+	vkal_allocate_descriptor_sets(vkal_info->default_descriptor_pool, layouts, 1, &descriptor_set_center_tet);
+	vkal_allocate_descriptor_sets(vkal_info->default_descriptor_pool, layouts, 1, &descriptor_set_outter_tet);
 
 	/* Vertex Input Assembly */
 	VkVertexInputBindingDescription vertex_input_bindings[] =
@@ -434,35 +437,48 @@ int main() {
 		vkal_info->render_pass, pipeline_layout);
 
 	// Uniform Buffers
-	UniformBuffer uniform_buffer_handle = vkal_create_uniform_buffer(sizeof(ViewProjectionUBO), 1, 0);
-	vkal_update_descriptor_set_uniform(descriptor_set_1[0], uniform_buffer_handle, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+	UniformBuffer uniform_buffer_handle_center_tet = vkal_create_uniform_buffer(sizeof(ViewProjectionUBO), 1, 0);
+	UniformBuffer uniform_buffer_handle_outter_tet = vkal_create_uniform_buffer(sizeof(ViewProjectionUBO), 1, 0);
 
-	// Initialize Uniform Buffer
-	vkal_update_uniform(&uniform_buffer_handle, &view_projection_data);
+	vkal_update_descriptor_set_uniform(descriptor_set_center_tet[0], uniform_buffer_handle_center_tet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+	vkal_update_descriptor_set_uniform(descriptor_set_outter_tet[0], uniform_buffer_handle_outter_tet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 
 	// Indices für 4 Seiten des Tetraeders: links, rechts, hinten, oben
 	std::vector<uint32_t> tetraederIndices = {};
 	std::vector<Vertex> tetraederVertices = {};
 
-	// Build tetraeder geometry
+	//imGui
 	bool enableDepthTest = true;
 	int iterations = 0;
 	int old_iterations = 0;
 	bool enableCulling = true;
 	bool enableFillMode = true;
 	bool perspective = false;
+	bool tether = false;
 
+	// Build tetraeder geometry
 	const float scale = 100.0; // size of Base-Tetraeder
 	setupGeometry(iterations, scale, glm::mat4(1), tetraederVertices, tetraederIndices);
-	Model coneTetraeder{};
-	coneTetraeder.vertex_count = tetraederVertices.size();
-	coneTetraeder.offset = vkal_vertex_buffer_add(tetraederVertices.data(), sizeof(Vertex), tetraederVertices.size());
-	coneTetraeder.index_count = tetraederIndices.size();
-	coneTetraeder.index_buffer_offset = vkal_index_buffer_add(tetraederIndices.data(), coneTetraeder.index_count);
+	Model centerTetraeder{};
+	centerTetraeder.vertex_count = tetraederVertices.size();
+	centerTetraeder.offset = vkal_vertex_buffer_add(tetraederVertices.data(), sizeof(Vertex), tetraederVertices.size());
+	centerTetraeder.index_count = tetraederIndices.size();
+	centerTetraeder.index_buffer_offset = vkal_index_buffer_add(tetraederIndices.data(), centerTetraeder.index_count);
+	centerTetraeder.model_matrix = glm::mat4(1.0);
+
+	Model outterTetraeder{};
+	outterTetraeder.vertex_count = tetraederVertices.size();
+	outterTetraeder.offset = vkal_vertex_buffer_add(tetraederVertices.data(), sizeof(Vertex), tetraederVertices.size());
+	outterTetraeder.index_count = tetraederIndices.size();
+	outterTetraeder.index_buffer_offset = vkal_index_buffer_add(tetraederIndices.data(), outterTetraeder.index_count);
+	outterTetraeder.model_matrix = glm::mat4(1.0);
 
 	// ModelMatrix
-	glm::mat4 modelMatrix = glm::mat4(1);
+	glm::mat4 modelMatrix = glm::mat4(1.0);
 	modelMatrix = glm::translate(modelMatrix, glm::vec3(-scale/2, 0.0, -scale / 3 * hd));
+	glm::mat4 spinModelMatrix = glm::mat4(1.0);
+	glm::mat4 circleModelMatrix = glm::mat4(1.0);
+
 	// Camera
 	Camera camera = Camera(glm::vec3(0, 0, 200));
 
@@ -496,14 +512,14 @@ int main() {
 		}
 
 		// Timer
-		auto duration = std::chrono::high_resolution_clock::now();
-		float angle = std::chrono::duration_cast<std::chrono::milliseconds>(duration - start).count();
-		//float angle = std::chrono::duration_cast<std::chrono::milliseconds>(
-		//	std::chrono::system_clock::now().time_since_epoch()).count(); // Zeit in Millisekunden
-		//float sinusValue = std::sin(angle / (2 * GL_PI * periodendauer));
-		float degreeValue = std::fmod(static_cast<float>(start_time-base_time)*1e3 / (2 * GL_PI * periodendauer), 360.0);
-		glm::mat4 rotatedModelMatrix = glm::rotate(glm::mat4(1.0f), glm::radians(degreeValue), glm::vec3(0.0f, 1.0f, 0.0f)) * modelMatrix;
-
+		float centerdegreeValue = std::fmod(static_cast<float>(start_time - base_time) * 1e3 / (2 * GL_PI * periodendauer), 360.0);
+		float outterdegreeValue = -std::fmod(static_cast<float>(start_time - base_time) * 1e3 * 4 / (2 * GL_PI * periodendauer), 360.0);
+		float scaleFactor = 1.0 + std::sin(std::fmod(static_cast<float>(start_time - base_time) * 1e3 / (20 * GL_PI * periodendauer), 360.0)) / 2;
+		spinModelMatrix = glm::rotate(modelMatrix, glm::radians(centerdegreeValue), glm::vec3(0.0f, 1.0f, 0.0f)); // for center Model
+		spinModelMatrix = glm::scale(spinModelMatrix, glm::vec3(0.5 + scaleFactor, 0.5 + scaleFactor, 0.5 + scaleFactor)) * modelMatrix;
+		circleModelMatrix = glm::rotate(modelMatrix, glm::radians(outterdegreeValue), glm::vec3(0.0f, 1.0f, 0.0f)); // for outter Model
+		circleModelMatrix = glm::translate(circleModelMatrix, glm::vec3(150.0, 0.0, 0.0)); 
+		//circleModelMatrix = glm::rotate(circleModelMatrix, glm::radians(-outterdegreeValue), glm::vec3(0.0f, 1.0f, 0.0f));
 
 		// Start the Dear ImGui frame
 		ImGui_ImplVulkan_NewFrame();
@@ -518,7 +534,17 @@ int main() {
 			ImGui::Checkbox("Enable Fill Mode", &enableFillMode);
 			ImGui::Checkbox("Perspective", &perspective);
 			ImGui::SliderFloat("FOV", &fov, 30.0, 89.0);
+			ImGui::Checkbox("Tether-Mode", &tether);
 			ImGui::End();
+		}
+
+		update_modelMatrix(modelMatrix, float(dt * 100.f));
+		if (tether){ // TODO: Camera mitbewegen mit outter tetraeder
+			//update_camera(circleModelMatrix, float(dt * 1000.f));
+			update_camera(camera, float(dt * 1000.f));
+		}
+		else {
+			update_camera(camera, float(dt * 1000.f));
 		}
 
 
@@ -526,16 +552,6 @@ int main() {
 		if (!ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()) && !ImGui::IsAnyItemActive()) {
 			update_camera_mouse_look(camera, dt*1000.0f);
 		}
-
-		view_projection_data.model = rotatedModelMatrix;
-		if (perspective) {
-			view_projection_data.projection = adjust_y_for_vulkan_ndc * glm::perspective(glm::radians(fov),float(width/height),100.0f,1000.0f);
-		}
-		else {
-			view_projection_data.projection = adjust_y_for_vulkan_ndc * glm::ortho(-100.0f, 100.0f, -100.0f, 100.0f, -1000.0f, 1000.0f);	
-		}
-		view_projection_data.view = glm::lookAt(camera.m_Pos, camera.m_Center, camera.m_Up);
-		vkal_update_uniform(&uniform_buffer_handle, &view_projection_data);
 
 		// Select pipeline
 		if (enableFillMode) {
@@ -548,18 +564,39 @@ int main() {
 		if (old_iterations != iterations){
 			tetraederIndices.clear();
 			tetraederVertices.clear();
-			setupGeometry(iterations, scale, rotatedModelMatrix, tetraederVertices, tetraederIndices);
-			coneTetraeder = Model();
-			coneTetraeder.vertex_count = tetraederVertices.size();
-			coneTetraeder.offset = vkal_vertex_buffer_add(tetraederVertices.data(), sizeof(Vertex), tetraederVertices.size());
-			coneTetraeder.index_count = tetraederIndices.size();
-			coneTetraeder.index_buffer_offset = vkal_index_buffer_add(tetraederIndices.data(), coneTetraeder.index_count);
+			setupGeometry(iterations, scale, glm::mat4(1.0), tetraederVertices, tetraederIndices);
+
+			centerTetraeder = Model();
+			centerTetraeder.vertex_count = tetraederVertices.size();
+			centerTetraeder.offset = vkal_vertex_buffer_add(tetraederVertices.data(), sizeof(Vertex), tetraederVertices.size());
+			centerTetraeder.index_count = tetraederIndices.size();
+			centerTetraeder.index_buffer_offset = vkal_index_buffer_add(tetraederIndices.data(), centerTetraeder.index_count);
+
+			outterTetraeder = Model();
+			outterTetraeder.vertex_count = tetraederVertices.size();
+			outterTetraeder.offset = vkal_vertex_buffer_add(tetraederVertices.data(), sizeof(Vertex), tetraederVertices.size());
+			outterTetraeder.index_count = tetraederIndices.size();
+			outterTetraeder.index_buffer_offset = vkal_index_buffer_add(tetraederIndices.data(), outterTetraeder.index_count);
+
 			old_iterations = iterations;
 		}
+		centerTetraeder.model_matrix = spinModelMatrix;
+		outterTetraeder.model_matrix = circleModelMatrix;
 
-		update_modelMatrix(rotatedModelMatrix, float(dt * 100.f));
-		update_camera(camera, float(dt * 1000.f));
-		
+		view_projection_data.model = centerTetraeder.model_matrix; //spinModelMatrix;
+		vkal_update_uniform(&uniform_buffer_handle_center_tet, &view_projection_data);
+		view_projection_data.model = outterTetraeder.model_matrix;
+		vkal_update_uniform(&uniform_buffer_handle_outter_tet, &view_projection_data);
+
+		if (perspective) {
+			view_projection_data.projection = adjust_y_for_vulkan_ndc * glm::perspective(glm::radians(fov), float(width / height), 100.0f, 1000.0f);
+		}
+		else {
+			view_projection_data.projection = adjust_y_for_vulkan_ndc * glm::ortho(-100.0f, 100.0f, -100.0f, 100.0f, -1000.0f, 1000.0f);
+		}
+		view_projection_data.view = glm::lookAt(camera.m_Pos, camera.m_Center, camera.m_Up);
+
+
 		{
 			uint32_t image_id = vkal_get_image();
 
@@ -574,8 +611,13 @@ int main() {
 				(float)width, (float)height);
 			vkal_set_clear_color({ 0.6f, 0.6f, 0.6f, 1.0f });
 
-			vkal_bind_descriptor_set(image_id, &descriptor_set_1[0], pipeline_layout);
-			vkal_draw_indexed(image_id, active_pipeline, coneTetraeder.index_buffer_offset, coneTetraeder.index_count, coneTetraeder.offset, 1);
+			// Draw models
+
+			vkal_bind_descriptor_set(image_id, &descriptor_set_center_tet[0], pipeline_layout);
+			vkal_draw_indexed(image_id, active_pipeline, centerTetraeder.index_buffer_offset, centerTetraeder.index_count, centerTetraeder.offset, 1);
+
+			vkal_bind_descriptor_set(image_id, &descriptor_set_outter_tet[0], pipeline_layout);
+			vkal_draw_indexed(image_id, active_pipeline, outterTetraeder.index_buffer_offset, outterTetraeder.index_count, outterTetraeder.offset, 1);
 
 			// Rendering ImGUI
 			ImGui::Render();
@@ -607,7 +649,8 @@ int main() {
 
 	deinit_imgui(vkal_info);
 
-	free(descriptor_set_1);
+	free(descriptor_set_center_tet);
+	free(descriptor_set_outter_tet);
 
 	vkal_cleanup();
 

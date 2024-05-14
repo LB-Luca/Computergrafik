@@ -410,3 +410,5 @@ dependencies/assimp
 dependencies/vkal
 
 *.zip
+
+install/

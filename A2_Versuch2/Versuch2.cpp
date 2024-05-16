@@ -478,9 +478,11 @@ int main() {
 	modelMatrix = glm::translate(modelMatrix, glm::vec3(-scale/2, 0.0, -scale / 3 * hd));
 	glm::mat4 spinModelMatrix = glm::mat4(1.0);
 	glm::mat4 circleModelMatrix = glm::mat4(1.0);
+	glm::mat4 cameraModelMatrix = glm::mat4(1.0);
+	glm::mat4 test = glm::mat4(1.0);
 
 	// Camera
-	Camera camera = Camera(glm::vec3(0, 0, 200));
+	Camera camera = Camera(glm::vec3(0, 0, 300));
 
 	// User Interface 
 	double timer_frequency = glfwGetTimerFrequency();
@@ -494,7 +496,7 @@ int main() {
 
 	// Timer functions
 	auto start = std::chrono::high_resolution_clock::now();
-	float periodendauer = 5;
+	float periodendauer = 5.0;
 	
 	double base_time = glfwGetTime();
 
@@ -515,11 +517,16 @@ int main() {
 		float centerdegreeValue = std::fmod(static_cast<float>(start_time - base_time) * 1e3 / (2 * GL_PI * periodendauer), 360.0);
 		float outterdegreeValue = -std::fmod(static_cast<float>(start_time - base_time) * 1e3 * 4 / (2 * GL_PI * periodendauer), 360.0);
 		float scaleFactor = 1.0 + std::sin(std::fmod(static_cast<float>(start_time - base_time) * 1e3 / (20 * GL_PI * periodendauer), 360.0)) / 2;
+		float cameraDegree = -std::fmod(static_cast<float>(start_time - base_time) * 1e3 * 4 / (2 * GL_PI * periodendauer), 360.0);
+
 		spinModelMatrix = glm::rotate(modelMatrix, glm::radians(centerdegreeValue), glm::vec3(0.0f, 1.0f, 0.0f)); // for center Model
-		spinModelMatrix = glm::scale(spinModelMatrix, glm::vec3(0.5 + scaleFactor, 0.5 + scaleFactor, 0.5 + scaleFactor)) * modelMatrix;
+		spinModelMatrix = glm::scale(spinModelMatrix, glm::vec3(scaleFactor, scaleFactor, scaleFactor)) * modelMatrix;
+
 		circleModelMatrix = glm::rotate(modelMatrix, glm::radians(outterdegreeValue), glm::vec3(0.0f, 1.0f, 0.0f)); // for outter Model
-		circleModelMatrix = glm::translate(circleModelMatrix, glm::vec3(150.0, 0.0, 0.0)); 
+		circleModelMatrix = glm::translate(circleModelMatrix, glm::vec3(100.0, 0.0, 0.0));
 		//circleModelMatrix = glm::rotate(circleModelMatrix, glm::radians(-outterdegreeValue), glm::vec3(0.0f, 1.0f, 0.0f));
+
+		cameraModelMatrix = glm::translate(circleModelMatrix, glm::vec3(scale / 2, scale * hp, scale / 3 * hd + 200.0));
 
 		// Start the Dear ImGui frame
 		ImGui_ImplVulkan_NewFrame();
@@ -527,7 +534,7 @@ int main() {
 		ImGui::NewFrame();
 
 		{
-			ImGui::Begin("Versuch 1.2");
+			ImGui::Begin("Versuch 2");
 			//ImGui::Checkbox("Enable Depth test", &enableDepthTest);
 			//ImGui::Checkbox("Enable Face culling", &enableCulling);
 			ImGui::SliderInt("Iterations", &iterations, 0, 8);
@@ -539,14 +546,19 @@ int main() {
 		}
 
 		update_modelMatrix(modelMatrix, float(dt * 100.f));
-		if (tether){ // TODO: Camera mitbewegen mit outter tetraeder
-			//update_camera(circleModelMatrix, float(dt * 1000.f));
-			update_camera(camera, float(dt * 1000.f));
+
+		update_camera(camera, float(dt * 1000.f));
+		if (tether){
+			/*camera.m_Pos = glm::vec3(cameraModelMatrix[3]);
+			camera.m_Center = glm::vec3(circleModelMatrix[3]);
+			camera.m_Up = glm::vec3(0.0, 1.0, 0.0);
+			view_projection_data.view = glm::lookAt(camera.m_Pos, camera.m_Center, camera.m_Up);*/
+			view_projection_data.view = glm::lookAt(glm::vec3(cameraModelMatrix*glm::vec4(camera.m_Pos,1.0)), glm::vec3(cameraModelMatrix * glm::vec4(camera.m_Center, 1.0)), camera.m_Up);
 		}
 		else {
-			update_camera(camera, float(dt * 1000.f));
+			view_projection_data.view = glm::lookAt(camera.m_Pos, camera.m_Center, camera.m_Up);
 		}
-
+		
 
 		// Mouse update
 		if (!ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()) && !ImGui::IsAnyItemActive()) {
@@ -566,15 +578,17 @@ int main() {
 			tetraederVertices.clear();
 			setupGeometry(iterations, scale, glm::mat4(1.0), tetraederVertices, tetraederIndices);
 
-			centerTetraeder = Model();
+			//centerTetraeder = Model();
 			centerTetraeder.vertex_count = tetraederVertices.size();
 			centerTetraeder.offset = vkal_vertex_buffer_add(tetraederVertices.data(), sizeof(Vertex), tetraederVertices.size());
 			centerTetraeder.index_count = tetraederIndices.size();
 			centerTetraeder.index_buffer_offset = vkal_index_buffer_add(tetraederIndices.data(), centerTetraeder.index_count);
 
-			outterTetraeder = Model();
+			// TODO: Problem: Speicher läuft langsam voll durch neue vertex_buffer
+			//outterTetraeder = Model();
 			outterTetraeder.vertex_count = tetraederVertices.size();
 			outterTetraeder.offset = vkal_vertex_buffer_add(tetraederVertices.data(), sizeof(Vertex), tetraederVertices.size());
+			//vkal_vertex_buffer_update(tetraederVertices.data(), tetraederVertices.size(), sizeof(Vertex), 0);
 			outterTetraeder.index_count = tetraederIndices.size();
 			outterTetraeder.index_buffer_offset = vkal_index_buffer_add(tetraederIndices.data(), outterTetraeder.index_count);
 
@@ -589,12 +603,12 @@ int main() {
 		vkal_update_uniform(&uniform_buffer_handle_outter_tet, &view_projection_data);
 
 		if (perspective) {
-			view_projection_data.projection = adjust_y_for_vulkan_ndc * glm::perspective(glm::radians(fov), float(width / height), 100.0f, 1000.0f);
+			view_projection_data.projection = adjust_y_for_vulkan_ndc * glm::perspective(glm::radians(fov), float(width / height), 10.0f, 1000.0f);
 		}
 		else {
 			view_projection_data.projection = adjust_y_for_vulkan_ndc * glm::ortho(-100.0f, 100.0f, -100.0f, 100.0f, -1000.0f, 1000.0f);
 		}
-		view_projection_data.view = glm::lookAt(camera.m_Pos, camera.m_Center, camera.m_Up);
+		
 
 
 		{
